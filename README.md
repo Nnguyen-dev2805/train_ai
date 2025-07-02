@@ -1,0 +1,1 @@
+# LET'S WITH ME TRAIN AI 
