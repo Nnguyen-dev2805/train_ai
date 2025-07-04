@@ -1,8 +1,8 @@
-prefix=D:/CODE/AI/Ucademy_Course/venv/Library
-exec_prefix=D:/CODE/AI/Ucademy_Course/venv/Library
-libdir=D:/CODE/AI/Ucademy_Course/venv/Library/lib
-sharedlibdir=D:/CODE/AI/Ucademy_Course/venv/Library/lib
-includedir=D:/CODE/AI/Ucademy_Course/venv/Library/include
+prefix=D:/CODE/AI/train_ai/venv/Library
+exec_prefix=D:/CODE/AI/train_ai/venv/Library
+libdir=D:/CODE/AI/train_ai/venv/Library/lib
+sharedlibdir=D:/CODE/AI/train_ai/venv/Library/lib
+includedir=D:/CODE/AI/train_ai/venv/Library/include
 
 Name: zlib
 Description: zlib compression library

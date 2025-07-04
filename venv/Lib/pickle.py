@@ -533,11 +533,10 @@ class _Pickler:
         self.framer.commit_frame()
 
         # Check for persistent id (defined by a subclass)
-        if save_persistent_id:
-            pid = self.persistent_id(obj)
-            if pid is not None:
-                self.save_pers(pid)
-                return
+        pid = self.persistent_id(obj)
+        if pid is not None and save_persistent_id:
+            self.save_pers(pid)
+            return
 
         # Check the memo
         x = self.memo.get(id(obj))

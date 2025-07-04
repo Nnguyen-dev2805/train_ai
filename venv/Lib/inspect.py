@@ -1638,15 +1638,11 @@ def getclosurevars(func):
     global_vars = {}
     builtin_vars = {}
     unbound_names = set()
-    global_names = set()
-    for instruction in dis.get_instructions(code):
-        opname = instruction.opname
-        name = instruction.argval
-        if opname == "LOAD_ATTR":
-            unbound_names.add(name)
-        elif opname == "LOAD_GLOBAL":
-            global_names.add(name)
-    for name in global_names:
+    for name in code.co_names:
+        if name in ("None", "True", "False"):
+            # Because these used to be builtins instead of keywords, they
+            # may still show up as name references. We ignore them.
+            continue
         try:
             global_vars[name] = global_ns[name]
         except KeyError:
@@ -3161,9 +3157,6 @@ class Signature:
                         break
                     elif param.name in kwargs:
                         if param.kind == _POSITIONAL_ONLY:
-                            if param.default is _empty:
-                                msg = f'missing a required positional-only argument: {param.name!r}'
-                                raise TypeError(msg)
                             # Raise a TypeError once we are sure there is no
                             # **kwargs param later.
                             pos_only_param_in_kwargs.append(param)

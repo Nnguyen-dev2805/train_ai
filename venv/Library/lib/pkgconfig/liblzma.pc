@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: 0BSD
 # Author: Lasse Collin
 
-prefix=D:/CODE/AI/Ucademy_Course/venv/Library
+prefix=D:/CODE/AI/train_ai/venv/Library
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include

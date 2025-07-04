@@ -76,9 +76,6 @@ struct _Py_unicode_state {
 
 extern void _PyUnicode_ClearInterned(PyInterpreterState *interp);
 
-// Like PyUnicode_AsUTF8(), but check for embedded null characters.
-extern const char* _PyUnicode_AsUTF8NoNUL(PyObject *);
-
 
 #ifdef __cplusplus
 }

@@ -303,7 +303,7 @@ class Path:
         if self.is_dir():
             raise IsADirectoryError(self)
         zip_mode = mode[0]
-        if zip_mode == 'r' and not self.exists():
+        if not self.exists() and zip_mode == 'r':
             raise FileNotFoundError(self)
         stream = self.root.open(self.at, zip_mode, pwd=pwd)
         if 'b' in mode:

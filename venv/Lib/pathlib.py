@@ -359,9 +359,9 @@ class PurePath(object):
         paths = []
         for arg in args:
             if isinstance(arg, PurePath):
-                if arg._flavour is not self._flavour:
+                if arg._flavour is ntpath and self._flavour is posixpath:
                     # GH-103631: Convert separators for backwards compatibility.
-                    paths.append(arg.as_posix())
+                    paths.extend(path.replace('\\', '/') for path in arg._raw_paths)
                 else:
                     paths.extend(arg._raw_paths)
             else:

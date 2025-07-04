@@ -592,13 +592,19 @@ class EnumType(type):
         classdict['_all_bits_'] = 0
         classdict['_inverted_'] = None
         try:
+            exc = None
             enum_class = super().__new__(metacls, cls, bases, classdict, **kwds)
         except Exception as e:
-            # since 3.12 the note "Error calling __set_name__ on '_proto_member' instance ..."
-            # is tacked on to the error instead of raising a RuntimeError, so discard it
-            if hasattr(e, '__notes__'):
-                del e.__notes__
-            raise
+            # since 3.12 the line "Error calling __set_name__ on '_proto_member' instance ..."
+            # is tacked on to the error instead of raising a RuntimeError
+            # recreate the exception to discard
+            exc = type(e)(str(e))
+            exc.__cause__ = e.__cause__
+            exc.__context__ = e.__context__
+            tb = e.__traceback__
+        if exc is not None:
+            raise exc.with_traceback(tb)
+        #
         # update classdict with any changes made by __init_subclass__
         classdict.update(enum_class.__dict__)
         #
@@ -771,15 +777,10 @@ class EnumType(type):
         `value` is in `cls` if:
         1) `value` is a member of `cls`, or
         2) `value` is the value of one of the `cls`'s members.
-        3) `value` is a pseudo-member (flags)
         """
         if isinstance(value, cls):
             return True
-        try:
-            cls(value)
-            return True
-        except ValueError:
-            return value in cls._unhashable_values_
+        return value in cls._value2member_map_ or value in cls._unhashable_values_
 
     def __delattr__(cls, attr):
         # nicer error message when someone tries to delete an attribute

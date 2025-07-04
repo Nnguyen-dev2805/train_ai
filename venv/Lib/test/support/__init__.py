@@ -43,7 +43,7 @@ __all__ = [
     "requires_limited_api", "requires_specialization",
     # sys
     "MS_WINDOWS", "is_jython", "is_android", "is_emscripten", "is_wasi",
-    "is_apple_mobile", "check_impl_detail", "unix_shell", "setswitchinterval",
+    "check_impl_detail", "unix_shell", "setswitchinterval",
     # os
     "get_pagesize",
     # network
@@ -250,16 +250,22 @@ def _is_gui_available():
         # process not running under the same user id as the current console
         # user.  To avoid that, raise an exception if the window manager
         # connection is not available.
-        import subprocess
-        try:
-            rc = subprocess.run(["launchctl", "managername"],
-                                capture_output=True, check=True)
-            managername = rc.stdout.decode("utf-8").strip()
-        except subprocess.CalledProcessError:
-            reason = "unable to detect macOS launchd job manager"
+        from ctypes import cdll, c_int, pointer, Structure
+        from ctypes.util import find_library
+
+        app_services = cdll.LoadLibrary(find_library("ApplicationServices"))
+
+        if app_services.CGMainDisplayID() == 0:
+            reason = "gui tests cannot run without OS X window manager"
         else:
-            if managername != "Aqua":
-                reason = f"{managername=} -- can only run in a macOS GUI session"
+            class ProcessSerialNumber(Structure):
+                _fields_ = [("highLongOfPSN", c_int),
+                            ("lowLongOfPSN", c_int)]
+            psn = ProcessSerialNumber()
+            psn_p = pointer(psn)
+            if (  (app_services.GetCurrentProcess(psn_p) < 0) or
+                  (app_services.SetFrontProcess(psn_p) < 0) ):
+                reason = "cannot run without OS X gui process"
 
     # check on every platform whether tkinter can actually do anything
     if not reason:
@@ -525,7 +531,7 @@ is_jython = sys.platform.startswith('java')
 
 is_android = hasattr(sys, 'getandroidapilevel')
 
-if sys.platform not in {"win32", "vxworks", "ios", "tvos", "watchos"}:
+if sys.platform not in ('win32', 'vxworks'):
     unix_shell = '/system/bin/sh' if is_android else '/bin/sh'
 else:
     unix_shell = None
@@ -535,35 +541,19 @@ else:
 is_emscripten = sys.platform == "emscripten"
 is_wasi = sys.platform == "wasi"
 
-# Apple mobile platforms (iOS/tvOS/watchOS) are POSIX-like but do not
-# have subprocess or fork support.
-is_apple_mobile = sys.platform in {"ios", "tvos", "watchos"}
-is_apple = is_apple_mobile or sys.platform == "darwin"
-
-has_fork_support = hasattr(os, "fork") and not (
-    is_emscripten
-    or is_wasi
-    or is_apple_mobile
-)
+has_fork_support = hasattr(os, "fork") and not is_emscripten and not is_wasi
 
 def requires_fork():
     return unittest.skipUnless(has_fork_support, "requires working os.fork()")
 
-has_subprocess_support = not (
-    is_emscripten
-    or is_wasi
-    or is_apple_mobile
-)
+has_subprocess_support = not is_emscripten and not is_wasi
 
 def requires_subprocess():
     """Used for subprocess, os.spawn calls, fd inheritance"""
     return unittest.skipUnless(has_subprocess_support, "requires subprocess support")
 
 # Emscripten's socket emulation and WASI sockets have limitations.
-has_socket_support = not (
-    is_emscripten
-    or is_wasi
-)
+has_socket_support = not is_emscripten and not is_wasi
 
 def requires_working_socket(*, module=False):
     """Skip tests or modules that require working sockets
@@ -799,11 +789,7 @@ def python_is_optimized():
     for opt in cflags.split():
         if opt.startswith('-O'):
             final_opt = opt
-    if sysconfig.get_config_var("CC") == "gcc":
-        non_opts = ('', '-O0', '-Og')
-    else:
-        non_opts = ('', '-O0')
-    return final_opt not in non_opts
+    return final_opt not in ('', '-O0', '-Og')
 
 
 def check_cflags_pgo():
@@ -868,8 +854,8 @@ def check_sizeof(test, o, size):
     test.assertEqual(result, size, msg)
 
 #=======================================================================
-# Decorator/context manager for running a code in a different locale,
-# correctly resetting it afterwards.
+# Decorator for running a function in a different locale, correctly resetting
+# it afterwards.
 
 @contextlib.contextmanager
 def run_with_locale(catstr, *locales):
@@ -880,67 +866,22 @@ def run_with_locale(catstr, *locales):
     except AttributeError:
         # if the test author gives us an invalid category string
         raise
-    except Exception:
+    except:
         # cannot retrieve original locale, so do nothing
         locale = orig_locale = None
-        if '' not in locales:
-            raise unittest.SkipTest('no locales')
     else:
         for loc in locales:
             try:
                 locale.setlocale(category, loc)
                 break
-            except locale.Error:
+            except:
                 pass
-        else:
-            if '' not in locales:
-                raise unittest.SkipTest(f'no locales {locales}')
 
     try:
         yield
     finally:
         if locale and orig_locale:
             locale.setlocale(category, orig_locale)
-
-#=======================================================================
-# Decorator for running a function in multiple locales (if they are
-# availasble) and resetting the original locale afterwards.
-
-def run_with_locales(catstr, *locales):
-    def deco(func):
-        @functools.wraps(func)
-        def wrapper(self, /, *args, **kwargs):
-            dry_run = '' in locales
-            try:
-                import locale
-                category = getattr(locale, catstr)
-                orig_locale = locale.setlocale(category)
-            except AttributeError:
-                # if the test author gives us an invalid category string
-                raise
-            except Exception:
-                # cannot retrieve original locale, so do nothing
-                pass
-            else:
-                try:
-                    for loc in locales:
-                        with self.subTest(locale=loc):
-                            try:
-                                locale.setlocale(category, loc)
-                            except locale.Error:
-                                self.skipTest(f'no locale {loc!r}')
-                            else:
-                                dry_run = False
-                                func(self, *args, **kwargs)
-                finally:
-                    locale.setlocale(category, orig_locale)
-            if dry_run:
-                # no locales available, so just run the test
-                # with the current locale
-                with self.subTest(locale=None):
-                    func(self, *args, **kwargs)
-        return wrapper
-    return deco
 
 #=======================================================================
 # Decorator for running a function in a specific timezone, correctly
@@ -2454,9 +2395,9 @@ else:
     else:
         C_RECURSION_LIMIT = 10000
 
-# Windows doesn't have os.uname() but it doesn't support s390x.
-is_s390x = hasattr(os, 'uname') and os.uname().machine == 's390x'
-skip_on_s390x = unittest.skipIf(is_s390x, 'skipped on s390x')
+#Windows doesn't have os.uname() but it doesn't support s390x.
+skip_on_s390x = unittest.skipIf(hasattr(os, 'uname') and os.uname().machine == 's390x',
+                                'skipped on s390x')
 
 _BASE_COPY_SRC_DIR_IGNORED_NAMES = frozenset({
     # SRC_DIR/.git
